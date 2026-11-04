@@ -1,0 +1,5 @@
+MA windows: 10/30
+Strategy total return: 58.2290%
+Strategy max drawdown: 10.1085%
+Buy-and-hold total return: 75.7123%
+Buy-and-hold max drawdown: 18.5095%

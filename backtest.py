@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 
 BASE = Path(__file__).resolve().parent
-SHORT_WINDOW = 5
-LONG_WINDOW = 20
+SHORT_WINDOW = 10
+LONG_WINDOW = 30
 INITIAL_CASH = 100_000.0
 
 
@@ -36,7 +36,26 @@ def backtest(data):
     frame["shares"] = positions
     frame["equity"] = equities
     frame["nav"] = frame["equity"] / INITIAL_CASH
+
+    # Buy-and-hold benchmark: buy at first day's open, hold, daily close valuation
+    first_open = frame.iloc[0]["open"]
+    bh_shares = INITIAL_CASH / first_open
+    frame["nav_bh"] = bh_shares * frame["close"] / INITIAL_CASH
+
     return frame
+
+
+def compute_max_drawdown(nav_series):
+    """Maximum drawdown as a positive percentage, with initial NAV 1 in the peak history."""
+    peak = 1.0
+    max_dd = 0.0
+    for nav in nav_series:
+        if nav > peak:
+            peak = nav
+        dd = (peak - nav) / peak
+        if dd > max_dd:
+            max_dd = dd
+    return max_dd
 
 
 def main():
@@ -58,10 +77,21 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     result.to_csv(args.output / "backtest_result.csv", index=False)
     total_return = result["nav"].iloc[-1] - 1
-    summary = f"MA windows: {SHORT_WINDOW}/{LONG_WINDOW}\nTotal return: {total_return:.4%}\n"
+    max_dd = compute_max_drawdown(result["nav"])
+    bh_return = result["nav_bh"].iloc[-1] - 1
+    bh_max_dd = compute_max_drawdown(result["nav_bh"])
+    summary_lines = [
+        f"MA windows: {SHORT_WINDOW}/{LONG_WINDOW}",
+        f"Strategy total return: {total_return:.4%}",
+        f"Strategy max drawdown: {max_dd:.4%}",
+        f"Buy-and-hold total return: {bh_return:.4%}",
+        f"Buy-and-hold max drawdown: {bh_max_dd:.4%}",
+    ]
+    summary = "\n".join(summary_lines) + "\n"
     (args.output / "summary.txt").write_text(summary, encoding="utf-8")
     fig, ax = plt.subplots(figsize=(9, 4.5))
     ax.plot(result["date"], result["nav"], label="MA strategy", color="#2E6BAF")
+    ax.plot(result["date"], result["nav_bh"], label="Buy & hold", color="#E0533D")
     ax.set(title="Synthetic prices - MA backtest", xlabel="Date", ylabel="NAV (initial capital = 1)")
     ax.legend()
     ax.grid(alpha=0.2)
